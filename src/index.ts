@@ -9,29 +9,36 @@ import {
   SIZE,
 } from './game';
 import { renderBoard, renderStatus, renderHistory, renderHelp } from './display';
-import { GameState } from './types';
+import { GameState, PieceType, Position } from './types';
 
 // ---------------------------------------------------------------------------
 // Parse a move command into { from, to } or detect castling / special tokens
 // ---------------------------------------------------------------------------
 
-function parseMove(input: string, state: GameState) {
+const PROMO_MAP: Record<string, PieceType> = {
+  q: 'queen', r: 'rook', b: 'bishop', n: 'knight',
+};
+
+function parseMove(input: string, state: GameState): { from: Position; to: Position; promoteTo: PieceType } | null {
   const s = input.trim();
 
   // Castling notation
   if (s === 'O-O-O' || s === '0-0-0') {
     const row = state.currentTurn === 'white' ? 4 : 0;
-    const from = { row, col: 3 };
-    const to   = { row, col: 1 };
-    return { from, to };
+    return { from: { row, col: 3 }, to: { row, col: 1 }, promoteTo: 'queen' };
   }
 
-  // "d1c1"  or  "d1 c1"  or  "d1-c1"
+  // Strip spaces and dashes, then optional promotion suffix: "d2d3" / "a4b5=q" / "a4b5q"
   const clean = s.replace(/[\s\-]/g, '');
-  if (clean.length === 4) {
-    const from = parsePosition(clean.slice(0, 2));
-    const to   = parsePosition(clean.slice(2, 4));
-    if (from && to) return { from, to };
+  // Match: <from(2)><to(2)>[=?<piece>]
+  const m = clean.match(/^([a-e][1-5])([a-e][1-5])(?:=?([qrbn]))?$/i);
+  if (m) {
+    const from = parsePosition(m[1]);
+    const to   = parsePosition(m[2]);
+    if (from && to) {
+      const promoteTo: PieceType = m[3] ? (PROMO_MAP[m[3].toLowerCase()] ?? 'queen') : 'queen';
+      return { from, to, promoteTo };
+    }
   }
 
   return null;
@@ -80,7 +87,7 @@ async function main() {
   console.log('  ███████║██╔╝ ██╗██║  ██║██║  ██╗╚██████╔╝');
   console.log('  ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ');
   console.log('\x1b[0m');
-  console.log('  5×5 Chess  —  each side: Rook · Knight · Queen · King · Bishop');
+  console.log('  5×5 Chess  —  Rook · Knight · Queen · King · Bishop + 5 Pawns per side');
   console.log('  Queenside castling available  (King d→b, Rook a→c)');
   console.log(renderHelp());
 
@@ -167,7 +174,7 @@ async function main() {
       continue;
     }
 
-    const next = makeMove(state, from, to);
+    const next = makeMove(state, from, to, parsed.promoteTo);
     if (!next) {
       const legal = getLegalMoves(state, from);
       if (legal.length === 0) {

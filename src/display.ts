@@ -2,8 +2,8 @@ import { Color, PieceType, GameState } from './types';
 import { getStatus, posToStr, SIZE } from './game';
 
 const GLYPH: Record<Color, Record<PieceType, string>> = {
-  white: { king: 'K', queen: 'Q', rook: 'R', bishop: 'B', knight: 'N' },
-  black: { king: 'k', queen: 'q', rook: 'r', bishop: 'b', knight: 'n' },
+  white: { king: 'K', queen: 'Q', rook: 'R', bishop: 'B', knight: 'N', pawn: 'P' },
+  black: { king: 'k', queen: 'q', rook: 'r', bishop: 'b', knight: 'n', pawn: 'p' },
 };
 
 // Light / dark square shading (background colours via ANSI)
@@ -84,15 +84,16 @@ export function renderHelp(): string {
   return [
     '',
     '\x1b[1mCommands:\x1b[0m',
-    '  <from><to>   Move a piece, e.g. \x1b[33md1c1\x1b[0m or \x1b[33md1 c1\x1b[0m',
-    '  O-O-O        Queenside castling (when legal)',
-    '  moves <sq>   Show legal moves for a piece, e.g. \x1b[33mmoves d1\x1b[0m',
-    '  board        Redraw the board',
-    '  history      Show move history',
-    '  help         Show this help',
-    '  quit / exit  Quit the game',
+    '  <from><to>       Move a piece, e.g. \x1b[33md2d3\x1b[0m or \x1b[33md2 d3\x1b[0m',
+    '  <from><to>=<p>   Promote a pawn, e.g. \x1b[33ma4a5=q\x1b[0m  (q r b n — default: q)',
+    '  O-O-O            Queenside castling (when legal)',
+    '  moves <sq>       Show legal moves for a piece, e.g. \x1b[33mmoves d2\x1b[0m',
+    '  board            Redraw the board',
+    '  history          Show move history',
+    '  help             Show this help',
+    '  quit / exit      Quit the game',
     '',
-    '\x1b[1mPiece symbols:\x1b[0m  K/k = King  Q/q = Queen  R/r = Rook  B/b = Bishop  N/n = Knight',
+    '\x1b[1mPiece symbols:\x1b[0m  K/k King  Q/q Queen  R/r Rook  B/b Bishop  N/n Knight  P/p Pawn',
     '  uppercase = White,  lowercase = Black',
     '',
   ].join('\n');

@@ -1,5 +1,5 @@
 export type Color = 'white' | 'black';
-export type PieceType = 'king' | 'queen' | 'rook' | 'bishop' | 'knight';
+export type PieceType = 'king' | 'queen' | 'rook' | 'bishop' | 'knight' | 'pawn';
 
 export interface Piece {
   type: PieceType;
@@ -22,6 +22,7 @@ export interface GameState {
   board: Board;
   currentTurn: Color;
   castlingRights: CastlingRights;
+  enPassantTarget: Position | null; // square a pawn can capture into via en passant
   moveHistory: string[];
 }
 

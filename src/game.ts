@@ -1,4 +1,4 @@
-import { Color, PieceType, Piece, Board, Position, CastlingRights, GameState, GameStatus } from './types';
+import { Color, PieceType, Board, Position, CastlingRights, GameState, GameStatus } from './types';
 
 export const SIZE = 5;
 
@@ -15,6 +15,8 @@ export function createInitialBoard(): Board {
   const board: Board = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
   for (let col = 0; col < SIZE; col++) {
     board[4][col] = { type: BACK_RANK[col], color: 'white' };
+    board[3][col] = { type: 'pawn',          color: 'white' }; // rank 2
+    board[1][col] = { type: 'pawn',          color: 'black' }; // rank 4
     board[0][col] = { type: BACK_RANK[col], color: 'black' };
   }
   return board;
@@ -25,6 +27,7 @@ export function createInitialState(): GameState {
     board: createInitialBoard(),
     currentTurn: 'white',
     castlingRights: { white: true, black: true },
+    enPassantTarget: null,
     moveHistory: [],
   };
 }
@@ -78,13 +81,19 @@ export function findKing(board: Board, color: Color): Position | null {
 
 // ---------------------------------------------------------------------------
 // Pseudo-legal move generation (ignores leaving own king in check)
+//
+// forAttack = true  →  return squares the piece *attacks* (used by isAttacked).
+//                      For pawns this means diagonals only, unconditionally.
+// forAttack = false →  return squares the piece can legally *move to*
+//                      (pawns: forward pushes + diagonal captures if occupied).
+//                      En-passant squares are handled separately in getLegalMoves.
 // ---------------------------------------------------------------------------
 
-function pseudoLegal(board: Board, pos: Position): Position[] {
+function pseudoLegal(board: Board, pos: Position, forAttack = false): Position[] {
   const piece = board[pos.row][pos.col];
   if (!piece) return [];
 
-  const { row, col, } = pos;
+  const { row, col } = pos;
   const { type, color } = piece;
   const result: Position[] = [];
 
@@ -132,6 +141,38 @@ function pseudoLegal(board: Board, pos: Position): Position[] {
         push(row + dr, col + dc);
       }
       break;
+
+    case 'pawn': {
+      // White moves up (dir = -1), black moves down (dir = +1).
+      const dir      = color === 'white' ? -1 : 1;
+      const startRow = color === 'white' ? 3  : 1;
+
+      if (forAttack) {
+        // Attack squares = the two diagonals, regardless of occupancy.
+        for (const dc of [-1, 1]) {
+          if (inBounds(row + dir, col + dc)) result.push({ row: row + dir, col: col + dc });
+        }
+      } else {
+        // Forward push(es) — only onto empty squares.
+        const fwd = row + dir;
+        if (inBounds(fwd, col) && !board[fwd][col]) {
+          result.push({ row: fwd, col });
+          if (row === startRow) {
+            const fwd2 = row + 2 * dir;
+            if (inBounds(fwd2, col) && !board[fwd2][col]) result.push({ row: fwd2, col });
+          }
+        }
+        // Diagonal captures — only onto occupied enemy squares (en passant added later).
+        for (const dc of [-1, 1]) {
+          const cr = row + dir, cc = col + dc;
+          if (inBounds(cr, cc)) {
+            const t = board[cr][cc];
+            if (t && t.color !== color) result.push({ row: cr, col: cc });
+          }
+        }
+      }
+      break;
+    }
   }
 
   return result;
@@ -146,8 +187,9 @@ export function isAttacked(board: Board, pos: Position, byColor: Color): boolean
     for (let c = 0; c < SIZE; c++) {
       const p = board[r][c];
       if (p && p.color === byColor) {
-        const moves = pseudoLegal(board, { row: r, col: c });
-        if (moves.some(m => m.row === pos.row && m.col === pos.col)) return true;
+        // Use forAttack=true so pawn diagonals are checked unconditionally.
+        if (pseudoLegal(board, { row: r, col: c }, true)
+              .some(m => m.row === pos.row && m.col === pos.col)) return true;
       }
     }
   }
@@ -165,46 +207,42 @@ export function isInCheck(board: Board, color: Color): boolean {
 // Castling
 // ---------------------------------------------------------------------------
 // Layout:  col  0   1   2   3   4
-//                R   N   Q   K   B
-// Queens-side castling (both colours):
-//   King d→b  (col 3 → col 1),  Rook a→c  (col 0 → col 2)
-//   Squares b and c (cols 1, 2) must be vacant.
-//   King must not be in check on d, c, or b.
+//                R  [p]  [p]  K   B    (after pawns placed)
+// Queens-side castling: King d→b (col 3→1), Rook a→c (col 0→2).
+// b and c must be empty; king may not pass through or land in check.
 // ---------------------------------------------------------------------------
 
-function castlingTarget(color: Color): number {
-  return color === 'white' ? 4 : 0; // back-rank row
+function backRankRow(color: Color): number {
+  return color === 'white' ? 4 : 0;
 }
 
 function queensideCastlingMove(state: GameState): Position | null {
   const { board, currentTurn, castlingRights } = state;
   if (!castlingRights[currentTurn]) return null;
 
-  const row = castlingTarget(currentTurn);
+  const row = backRankRow(currentTurn);
   const kingPiece = board[row][3];
   const rookPiece = board[row][0];
 
   if (!kingPiece || kingPiece.type !== 'king' || kingPiece.color !== currentTurn) return null;
   if (!rookPiece || rookPiece.type !== 'rook' || rookPiece.color !== currentTurn) return null;
 
-  // Squares b and c must be empty
-  if (board[row][1] || board[row][2]) return null;
+  if (board[row][1] || board[row][2]) return null; // b and c must be vacant
 
   const opp: Color = currentTurn === 'white' ? 'black' : 'white';
 
-  // King must not be in check on its current square, on c (passing through), or on b (landing)
-  if (isAttacked(board, { row, col: 3 }, opp)) return null;
-  if (isAttacked(board, { row, col: 2 }, opp)) return null;
+  if (isAttacked(board, { row, col: 3 }, opp)) return null; // king in check
+  if (isAttacked(board, { row, col: 2 }, opp)) return null; // transit square attacked
 
-  // Check landing square after moving king
-  const afterCastle = cloneBoard(board);
-  afterCastle[row][1] = { type: 'king', color: currentTurn };
-  afterCastle[row][2] = { type: 'rook', color: currentTurn };
-  afterCastle[row][3] = null;
-  afterCastle[row][0] = null;
-  if (isAttacked(afterCastle, { row, col: 1 }, opp)) return null;
+  // Verify landing square is safe after the full castle.
+  const after = cloneBoard(board);
+  after[row][1] = { type: 'king', color: currentTurn };
+  after[row][2] = { type: 'rook', color: currentTurn };
+  after[row][3] = null;
+  after[row][0] = null;
+  if (isAttacked(after, { row, col: 1 }, opp)) return null;
 
-  return { row, col: 1 }; // king's destination
+  return { row, col: 1 };
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +258,21 @@ export function getLegalMoves(state: GameState, pos: Position): Position[] {
     return !isInCheck(b, piece.color);
   });
 
-  // Append castling destination for king
+  // En passant for pawns.
+  if (piece.type === 'pawn' && state.enPassantTarget) {
+    const ep  = state.enPassantTarget;
+    const dir = piece.color === 'white' ? -1 : 1;
+    if (ep.row === pos.row + dir && Math.abs(ep.col - pos.col) === 1) {
+      // Simulate: move our pawn to ep, remove captured pawn (same row, ep col).
+      const testBoard = cloneBoard(state.board);
+      testBoard[ep.row][ep.col]  = piece;
+      testBoard[pos.row][pos.col] = null;
+      testBoard[pos.row][ep.col]  = null; // captured pawn
+      if (!isInCheck(testBoard, piece.color)) legal.push(ep);
+    }
+  }
+
+  // Queenside castling destination for king.
   if (piece.type === 'king') {
     const castleTo = queensideCastlingMove(state);
     if (castleTo) legal.push(castleTo);
@@ -236,9 +288,7 @@ export function allLegalMoves(state: GameState): Array<{ from: Position; to: Pos
       const p = state.board[r][c];
       if (p && p.color === state.currentTurn) {
         const from = { row: r, col: c };
-        for (const to of getLegalMoves(state, from)) {
-          moves.push({ from, to });
-        }
+        for (const to of getLegalMoves(state, from)) moves.push({ from, to });
       }
     }
   }
@@ -250,10 +300,15 @@ export function allLegalMoves(state: GameState): Array<{ from: Position; to: Pos
 // ---------------------------------------------------------------------------
 
 const PIECE_LETTER: Record<PieceType, string> = {
-  king: 'K', queen: 'Q', rook: 'R', bishop: 'B', knight: 'N',
+  king: 'K', queen: 'Q', rook: 'R', bishop: 'B', knight: 'N', pawn: 'P',
 };
 
-export function makeMove(state: GameState, from: Position, to: Position): GameState | null {
+export function makeMove(
+  state: GameState,
+  from: Position,
+  to: Position,
+  promoteTo: PieceType = 'queen',
+): GameState | null {
   const piece = state.board[from.row][from.col];
   if (!piece || piece.color !== state.currentTurn) return null;
 
@@ -263,9 +318,10 @@ export function makeMove(state: GameState, from: Position, to: Position): GameSt
   const newCR: CastlingRights = { ...state.castlingRights };
   let newBoard = cloneBoard(state.board);
   let notation: string;
+  let newEP: Position | null = null;
 
-  // Detect queenside castling: king moves from col 3 to col 1
-  const row = castlingTarget(state.currentTurn);
+  // ── Queenside castling ────────────────────────────────────────────────────
+  const row = backRankRow(state.currentTurn);
   const isCastle = piece.type === 'king' && from.col === 3 && to.col === 1 && from.row === row;
 
   if (isCastle) {
@@ -275,22 +331,43 @@ export function makeMove(state: GameState, from: Position, to: Position): GameSt
     newBoard[row][0] = null;
     notation = 'O-O-O';
     newCR[state.currentTurn] = false;
-  } else {
-    const captured = state.board[to.row][to.col];
-    newBoard = applyMove(state.board, from, to);
 
+  } else {
+    // ── En passant ──────────────────────────────────────────────────────────
+    const isEP = piece.type === 'pawn'
+      && state.enPassantTarget !== null
+      && to.row === state.enPassantTarget.row
+      && to.col === state.enPassantTarget.col
+      && state.board[to.row][to.col] === null; // moving to empty square diagonally
+
+    newBoard = applyMove(state.board, from, to);
+    if (isEP) newBoard[from.row][to.col] = null; // remove the captured pawn
+
+    // ── Promotion ───────────────────────────────────────────────────────────
+    const isPromotion = piece.type === 'pawn' && (to.row === 0 || to.row === SIZE - 1);
+    if (isPromotion) newBoard[to.row][to.col] = { type: promoteTo, color: state.currentTurn };
+
+    // ── Notation ────────────────────────────────────────────────────────────
+    const captured = isEP || state.board[to.row][to.col] !== null;
     const sep = captured ? 'x' : '-';
     notation = PIECE_LETTER[piece.type] + posToStr(from) + sep + posToStr(to);
+    if (isPromotion) notation += `=${PIECE_LETTER[promoteTo]}`;
+    if (isEP) notation += ' e.p.';
 
-    // Lose castling rights when king or rook moves
+    // ── Castling-rights bookkeeping ─────────────────────────────────────────
     if (piece.type === 'king') newCR[state.currentTurn] = false;
     if (piece.type === 'rook' && from.col === 0 && from.row === row) newCR[state.currentTurn] = false;
 
-    // Lose castling rights when rook is captured on its starting square
-    if (captured && captured.type === 'rook') {
+    const capturedPiece = state.board[to.row][to.col];
+    if (capturedPiece && capturedPiece.type === 'rook') {
       const opp: Color = state.currentTurn === 'white' ? 'black' : 'white';
-      const oppRow = castlingTarget(opp);
+      const oppRow = backRankRow(opp);
       if (to.row === oppRow && to.col === 0) newCR[opp] = false;
+    }
+
+    // ── En-passant target for next move ─────────────────────────────────────
+    if (piece.type === 'pawn' && Math.abs(to.row - from.row) === 2) {
+      newEP = { row: (from.row + to.row) / 2, col: from.col };
     }
   }
 
@@ -300,6 +377,7 @@ export function makeMove(state: GameState, from: Position, to: Position): GameSt
     board: newBoard,
     currentTurn: nextTurn,
     castlingRights: newCR,
+    enPassantTarget: newEP,
     moveHistory: [...state.moveHistory, notation],
   };
 }
@@ -309,7 +387,7 @@ export function makeMove(state: GameState, from: Position, to: Position): GameSt
 // ---------------------------------------------------------------------------
 
 export function getStatus(state: GameState): GameStatus {
-  const moves = allLegalMoves(state);
+  const moves   = allLegalMoves(state);
   const inCheck = isInCheck(state.board, state.currentTurn);
 
   if (moves.length === 0) return inCheck ? 'checkmate' : 'stalemate';
