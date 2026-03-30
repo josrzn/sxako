@@ -2,8 +2,8 @@ import { Color, PieceType, GameState } from './types';
 import { getStatus, posToStr, SIZE } from './game';
 
 const GLYPH: Record<Color, Record<PieceType, string>> = {
-  white: { king: 'K', queen: 'Q', rook: 'R', bishop: 'B', knight: 'N', pawn: 'P' },
-  black: { king: 'k', queen: 'q', rook: 'r', bishop: 'b', knight: 'n', pawn: 'p' },
+  white: { king: '♔', queen: '♕', rook: '♖', bishop: '♗', knight: '♘', pawn: '♙' },
+  black: { king: '♚', queen: '♛', rook: '♜', bishop: '♝', knight: '♞', pawn: '♟' },
 };
 
 // Square backgrounds: amber light / rich brown dark
