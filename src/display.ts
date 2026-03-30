@@ -10,15 +10,15 @@ const LABEL: Record<PieceType, string> = {
   king: 'K', queen: 'Q', rook: 'R', bishop: 'B', knight: 'N', pawn: 'P',
 };
 
-// Square backgrounds: classic chess green
-const BG_LIGHT = '\x1b[48;5;107m'; // sage green
-const BG_DARK  = '\x1b[48;5;22m';  // forest green
+// Square backgrounds: classic wood tones
+const BG_LIGHT = '\x1b[48;5;179m'; // warm sand / light wood
+const BG_DARK  = '\x1b[48;5;94m';  // dark walnut
 const RESET    = '\x1b[0m';
 
-// Piece colours: bright white vs bright yellow — both contrast sharply on green
-const FG_WHITE = '\x1b[1;97m';  // bold bright white
-const FG_BLACK = '\x1b[1;93m';  // bold bright yellow
-const FG_DIM   = '\x1b[2m';     // dim for label row
+// Piece colours: cyan (white side) vs red (black side) — both visible on any square
+const FG_WHITE = '\x1b[1;96m';  // bold bright cyan
+const FG_BLACK = '\x1b[1;91m';  // bold bright red
+const FG_DIM   = '\x1b[2;37m';  // dim grey for label row
 
 function squareBg(row: number, col: number): string {
   return (row + col) % 2 === 0 ? BG_LIGHT : BG_DARK;
@@ -113,7 +113,7 @@ export function renderHelp(): string {
     '',
     '\x1b[1mPieces:\x1b[0m  K/k King  Q/q Queen  R/r Rook  B/b Bishop  N/n Knight  P/p Pawn',
     '  Each square shows the Unicode glyph + a letter label underneath for clarity.',
-    '  \x1b[1;97mBold white = White side\x1b[0m,  \x1b[1;93mBold yellow = Black side\x1b[0m',
+    '  \x1b[1;96mCyan = White side\x1b[0m,  \x1b[1;91mRed = Black side\x1b[0m',
     '',
   ].join('\n');
 }
