@@ -6,6 +6,10 @@ const GLYPH: Record<Color, Record<PieceType, string>> = {
   black: { king: '♚', queen: '♛', rook: '♜', bishop: '♝', knight: '♞', pawn: '♟' },
 };
 
+const LABEL: Record<PieceType, string> = {
+  king: 'K', queen: 'Q', rook: 'R', bishop: 'B', knight: 'N', pawn: 'P',
+};
+
 // Square backgrounds: classic chess green
 const BG_LIGHT = '\x1b[48;5;107m'; // sage green
 const BG_DARK  = '\x1b[48;5;22m';  // forest green
@@ -14,6 +18,7 @@ const RESET    = '\x1b[0m';
 // Piece colours: bright white vs bright yellow — both contrast sharply on green
 const FG_WHITE = '\x1b[1;97m';  // bold bright white
 const FG_BLACK = '\x1b[1;93m';  // bold bright yellow
+const FG_DIM   = '\x1b[2m';     // dim for label row
 
 function squareBg(row: number, col: number): string {
   return (row + col) % 2 === 0 ? BG_LIGHT : BG_DARK;
@@ -22,31 +27,42 @@ function squareBg(row: number, col: number): string {
 export function renderBoard(state: GameState): string {
   const { board } = state;
   const lines: string[] = [];
+  const SEP = '  +-----+-----+-----+-----+-----+';
 
   lines.push('');
-  lines.push('    a   b   c   d   e  ');
-  lines.push('  +---+---+---+---+---+');
+  lines.push('      a     b     c     d     e  ');
+  lines.push(SEP);
 
   for (let row = 0; row < SIZE; row++) {
     const rank = SIZE - row;
-    let line = `${rank} |`;
+
+    // Top line: glyph
+    let glyphLine = `${rank} |`;
+    // Bottom line: dim letter label
+    let labelLine = `  |`;
+
     for (let col = 0; col < SIZE; col++) {
       const piece = board[row][col];
       const bg = squareBg(row, col);
       if (piece) {
-        const fg = piece.color === 'white' ? FG_WHITE : FG_BLACK;
-        const ch = GLYPH[piece.color][piece.type];
-        line += `${bg}${fg} ${ch} ${RESET}|`;
+        const fg    = piece.color === 'white' ? FG_WHITE : FG_BLACK;
+        const glyph = GLYPH[piece.color][piece.type];
+        const lbl   = (piece.color === 'white' ? LABEL[piece.type] : LABEL[piece.type].toLowerCase());
+        glyphLine += `${bg}${fg}  ${glyph}  ${RESET}|`;
+        labelLine += `${bg}${FG_DIM}  ${lbl}  ${RESET}|`;
       } else {
-        line += `${bg}   ${RESET}|`;
+        glyphLine += `${bg}     ${RESET}|`;
+        labelLine += `${bg}     ${RESET}|`;
       }
     }
-    line += ` ${rank}`;
-    lines.push(line);
-    lines.push('  +---+---+---+---+---+');
+
+    glyphLine += ` ${rank}`;
+    lines.push(glyphLine);
+    lines.push(labelLine);
+    lines.push(SEP);
   }
 
-  lines.push('    a   b   c   d   e  ');
+  lines.push('      a     b     c     d     e  ');
   lines.push('');
   return lines.join('\n');
 }
@@ -95,8 +111,9 @@ export function renderHelp(): string {
     '  help             Show this help',
     '  quit / exit      Quit the game',
     '',
-    '\x1b[1mPiece symbols:\x1b[0m  \x1b[1;97m♔\x1b[0m/\x1b[1;93m♚\x1b[0m King  \x1b[1;97m♕\x1b[0m/\x1b[1;93m♛\x1b[0m Queen  \x1b[1;97m♖\x1b[0m/\x1b[1;93m♜\x1b[0m Rook  \x1b[1;97m♗\x1b[0m/\x1b[1;93m♝\x1b[0m Bishop  \x1b[1;97m♘\x1b[0m/\x1b[1;93m♞\x1b[0m Knight  \x1b[1;97m♙\x1b[0m/\x1b[1;93m♟\x1b[0m Pawn',
-    '  \x1b[1;97mwhite = White side\x1b[0m,  \x1b[1;93myellow = Black side\x1b[0m',
+    '\x1b[1mPieces:\x1b[0m  K/k King  Q/q Queen  R/r Rook  B/b Bishop  N/n Knight  P/p Pawn',
+    '  Each square shows the Unicode glyph + a letter label underneath for clarity.',
+    '  \x1b[1;97mBold white = White side\x1b[0m,  \x1b[1;93mBold yellow = Black side\x1b[0m',
     '',
   ].join('\n');
 }
