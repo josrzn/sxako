@@ -6,15 +6,14 @@ const GLYPH: Record<Color, Record<PieceType, string>> = {
   black: { king: 'k', queen: 'q', rook: 'r', bishop: 'b', knight: 'n', pawn: 'p' },
 };
 
-// Square backgrounds
-const BG_LIGHT = '\x1b[48;5;180m'; // warm tan
-const BG_DARK  = '\x1b[48;5;94m';  // warm brown
+// Square backgrounds: amber light / rich brown dark
+const BG_LIGHT = '\x1b[48;5;222m'; // amber
+const BG_DARK  = '\x1b[48;5;130m'; // rich brown
 const RESET    = '\x1b[0m';
 
-// Piece "badge" backgrounds — each piece letter gets its own inset bg so it
-// is always readable regardless of which square it sits on.
-const BADGE_WHITE = '\x1b[48;5;255m\x1b[38;5;237m\x1b[1m'; // near-white bg, dark-gray bold text
-const BADGE_BLACK = '\x1b[48;5;234m\x1b[38;5;253m\x1b[1m'; // near-black bg, near-white bold text
+// Piece colours: bright white vs bright blue — both pop on warm amber/brown
+const FG_WHITE = '\x1b[1;97m';  // bold bright white
+const FG_BLACK = '\x1b[1;94m';  // bold bright blue
 
 function squareBg(row: number, col: number): string {
   return (row + col) % 2 === 0 ? BG_LIGHT : BG_DARK;
@@ -35,10 +34,9 @@ export function renderBoard(state: GameState): string {
       const piece = board[row][col];
       const bg = squareBg(row, col);
       if (piece) {
-        const badge = piece.color === 'white' ? BADGE_WHITE : BADGE_BLACK;
-        const ch    = GLYPH[piece.color][piece.type];
-        // Square colour for the surrounding spaces; piece letter gets its own badge.
-        line += `${bg} ${badge}${ch}${RESET}${bg} ${RESET}|`;
+        const fg = piece.color === 'white' ? FG_WHITE : FG_BLACK;
+        const ch = GLYPH[piece.color][piece.type];
+        line += `${bg}${fg} ${ch} ${RESET}|`;
       } else {
         line += `${bg}   ${RESET}|`;
       }
