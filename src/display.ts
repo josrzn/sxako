@@ -6,14 +6,14 @@ const GLYPH: Record<Color, Record<PieceType, string>> = {
   black: { king: '♚', queen: '♛', rook: '♜', bishop: '♝', knight: '♞', pawn: '♟' },
 };
 
-// Square backgrounds: amber light / rich brown dark
-const BG_LIGHT = '\x1b[48;5;222m'; // amber
-const BG_DARK  = '\x1b[48;5;130m'; // rich brown
+// Square backgrounds: classic chess green
+const BG_LIGHT = '\x1b[48;5;107m'; // sage green
+const BG_DARK  = '\x1b[48;5;22m';  // forest green
 const RESET    = '\x1b[0m';
 
-// Piece colours: bright white vs bright blue — both pop on warm amber/brown
+// Piece colours: bright white vs bright yellow — both contrast sharply on green
 const FG_WHITE = '\x1b[1;97m';  // bold bright white
-const FG_BLACK = '\x1b[1;94m';  // bold bright blue
+const FG_BLACK = '\x1b[1;93m';  // bold bright yellow
 
 function squareBg(row: number, col: number): string {
   return (row + col) % 2 === 0 ? BG_LIGHT : BG_DARK;
@@ -95,8 +95,8 @@ export function renderHelp(): string {
     '  help             Show this help',
     '  quit / exit      Quit the game',
     '',
-    '\x1b[1mPiece symbols:\x1b[0m  K/k King  Q/q Queen  R/r Rook  B/b Bishop  N/n Knight  P/p Pawn',
-    '  uppercase = White,  lowercase = Black',
+    '\x1b[1mPiece symbols:\x1b[0m  \x1b[1;97m♔\x1b[0m/\x1b[1;93m♚\x1b[0m King  \x1b[1;97m♕\x1b[0m/\x1b[1;93m♛\x1b[0m Queen  \x1b[1;97m♖\x1b[0m/\x1b[1;93m♜\x1b[0m Rook  \x1b[1;97m♗\x1b[0m/\x1b[1;93m♝\x1b[0m Bishop  \x1b[1;97m♘\x1b[0m/\x1b[1;93m♞\x1b[0m Knight  \x1b[1;97m♙\x1b[0m/\x1b[1;93m♟\x1b[0m Pawn',
+    '  \x1b[1;97mwhite = White side\x1b[0m,  \x1b[1;93myellow = Black side\x1b[0m',
     '',
   ].join('\n');
 }
